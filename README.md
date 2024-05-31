@@ -8,4 +8,4 @@
 
 例如http://3d.ashes.vip/?img=https://oss.ashes.vip/PXL_20220603_085830322.PHOTOSPHERE.jpg
 
-部署index时,必须使用https,否则陀螺仪不能用
+部署index时,必须使用https,否则陀螺仪不能用.
