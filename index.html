@@ -22,56 +22,11 @@
             height: 100%;
         }
     </style>
-    <!-- Three.js（Photo Sphere Viewer 依赖） -->
-    <script src="https://unpkg.com/three/build/three.min.js"></script>
-    <!-- Photo Sphere Viewer core（UMD 构建） -->
-    <link rel="stylesheet" href="https://unpkg.com/@photo-sphere-viewer/core/index.css" />
-    <script src="https://unpkg.com/@photo-sphere-viewer/core/index.umd.cjs"></script>
-    <!-- 陀螺仪插件 -->
-    <script src="https://unpkg.com/@photo-sphere-viewer/gyroscope-plugin/index.umd.cjs"></script>
 </head>
 
 <body>
     <div id="viewer"></div>
-
-    <script>
-        function getQueryVariable(variable) {
-            let query = window.location.search.substring(1);
-            let vars = query.split('&');
-            for (let i = 0; i < vars.length; i++) {
-                let pair = vars[i].split('=');
-                if (pair[0] === variable) {
-                    return vars[i].replace(pair[0] + '=', '');
-                }
-            }
-            return false;
-        }
-
-        const defaultImg = 'https://oss.ashes.vip/PXL_20220601_085820493.PHOTOSPHERE.jpg';
-        const imgSrc = getQueryVariable('img') || defaultImg;
-
-        const viewer = new PhotoSphereViewer.Viewer({
-            container: document.getElementById('viewer'),
-            panorama: imgSrc,
-            // 触摸/鼠标控制
-            touchmoveTwoFingers: false,
-            // 默认视角
-            defaultZoomLvl: 50,
-            // 插件
-            plugins: [
-                [PhotoSphereViewer.GyroscopePlugin, {
-                    // 进入页面自动启用陀螺仪（需要用户授权）
-                    touchmove: true,
-                }],
-            ],
-            // 导航栏
-            navbar: [
-                'zoom',
-                'gyroscope', // 陀螺仪开关按钮
-                'fullscreen',
-            ],
-        });
-    </script>
+    <script type="module" src="/src/main.js"></script>
 </body>
 
 </html>
