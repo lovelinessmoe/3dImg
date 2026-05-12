@@ -1,22 +1,29 @@
 <html>
 
 <head>
-    <!-- 导入 Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <!-- exifr：读取图片 XMP/EXIF 元数据 -->
+    <script src="https://unpkg.com/exifr/dist/full.umd.cjs"></script>
 </head>
 
 <body>
     <div id="app">
-
-        <a-scene>
+        <a-scene v-if="ready">
             <a-assets>
-                <img id="sky" :src="imgSrc" />
+                <img id="sky" :src="imgSrc" crossorigin="anonymous" />
             </a-assets>
-            <a-sky src="#sky"></a-sky>
+            <a-sky
+                src="#sky"
+                :phi-start="skyParams.phiStart"
+                :phi-length="skyParams.phiLength"
+                :theta-start="skyParams.thetaStart"
+                :theta-length="skyParams.thetaLength"
+            ></a-sky>
         </a-scene>
     </div>
 </body>
+
 <script>
     function getQueryVariable(variable) {
         let query = window.location.search.substring(1);
@@ -24,33 +31,76 @@
         for (let i = 0; i < vars.length; i++) {
             let pair = vars[i].split("=");
             if (pair[0] === variable) {
-                // 如果有参数中包含等于号，那么就只返回值两个等于号中间的东西
-                // return pair[1];
-                // 所以返回去掉第一个等于号之前的东西
                 return vars[i].replace(pair[0] + "=", '');
             }
         }
         return false;
     }
 
-    const VueApp = {
-        setup() {
-            let imgSrc = Vue.ref('https://oss.ashes.vip/PXL_20220601_085820493.PHOTOSPHERE.jpg');
-            Vue.onBeforeMount(async () => {
-                let src = getQueryVariable('img');
-                if (src !== false) {
-                    imgSrc.value = src;
-                }
-                console.log(imgSrc);
-            });
-            return {
-                imgSrc
-            }
+    /**
+     * 从图片 URL 读取 XMP GPano 元数据，计算 a-sky 所需的角度参数。
+     * 
+     * GPano 字段说明：
+     *   FullPanoWidthPixels  — 完整 360° 全景对应的像素宽度
+     *   FullPanoHeightPixels — 完整 180° 全景对应的像素高度
+     *   CroppedAreaImageWidthPixels  — 实际图片的宽度
+     *   CroppedAreaImageHeightPixels — 实际图片的高度
+     *   CroppedAreaLeftPixels — 图片左边缘在完整全景中的偏移
+     *   CroppedAreaTopPixels  — 图片上边缘在完整全景中的偏移
+     */
+    async function getSkyParams(imgUrl) {
+        const defaults = { phiStart: 0, phiLength: 180, thetaStart: 0, thetaLength: 360 };
+        try {
+            const xmp = await exifr.parse(imgUrl, { xmp: true });
+            if (!xmp) return defaults;
+
+            const fullW = xmp.FullPanoWidthPixels;
+            const fullH = xmp.FullPanoHeightPixels;
+            const cropW = xmp.CroppedAreaImageWidthPixels;
+            const cropH = xmp.CroppedAreaImageHeightPixels;
+            const cropL = xmp.CroppedAreaLeftPixels;
+            const cropT = xmp.CroppedAreaTopPixels;
+
+            if (!fullW || !fullH || !cropW || !cropH) return defaults;
+
+            // 水平：左偏移和宽度换算成角度
+            const thetaStart  = (cropL / fullW) * 360;
+            const thetaLength = (cropW / fullW) * 360;
+
+            // 垂直：顶部偏移和高度换算成角度（A-Frame phi 从顶部算起）
+            const phiStart  = (cropT / fullH) * 180;
+            const phiLength = (cropH / fullH) * 180;
+
+            console.log('[GPano]', { fullW, fullH, cropW, cropH, cropL, cropT });
+            console.log('[sky params]', { phiStart, phiLength, thetaStart, thetaLength });
+
+            return { phiStart, phiLength, thetaStart, thetaLength };
+        } catch (e) {
+            console.warn('读取 XMP 元数据失败，使用默认参数', e);
+            return defaults;
         }
     }
-    const app = Vue.createApp(VueApp)
-    app.mount('#app');
-</script>
 
+    const VueApp = {
+        setup() {
+            const imgSrc = Vue.ref('https://oss.ashes.vip/PXL_20220601_085820493.PHOTOSPHERE.jpg');
+            const skyParams = Vue.ref({ phiStart: 0, phiLength: 180, thetaStart: 0, thetaLength: 360 });
+            const ready = Vue.ref(false);
+
+            Vue.onBeforeMount(async () => {
+                const src = getQueryVariable('img');
+                if (src !== false) imgSrc.value = src;
+
+                // 自动读取 XMP 元数据，计算显示范围
+                skyParams.value = await getSkyParams(imgSrc.value);
+                ready.value = true;
+            });
+
+            return { imgSrc, skyParams, ready };
+        }
+    };
+
+    Vue.createApp(VueApp).mount('#app');
+</script>
 
 </html>
