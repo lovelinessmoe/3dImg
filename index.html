@@ -10,8 +10,7 @@
     <div id="app">
         <a-scene v-if="ready">
             <a-assets>
-                <!-- 直接用 blob URL，避免二次请求 -->
-                <img id="sky" :src="blobUrl" crossorigin="anonymous" />
+                <img id="sky" :src="imgSrc" crossorigin="anonymous" />
             </a-assets>
             <a-sky
                 src="#sky"
@@ -38,11 +37,15 @@
     }
 
     /**
-     * 从已下载的 ArrayBuffer 中读取 XMP GPano 元数据
+     * 只下载图片前 128KB，XMP 元数据一定在这个范围内
      */
-    async function getSkyParams(buffer) {
+    async function getSkyParams(url) {
         const defaults = { phiStart: 0, phiLength: 180, thetaStart: 0, thetaLength: 360 };
         try {
+            // Range 请求只取前 128KB，避免下载整张大图
+            const response = await fetch(url, { headers: { Range: 'bytes=0-131071' } });
+            const buffer = await response.arrayBuffer();
+
             const xmp = await exifr.parse(buffer, { xmp: true });
             if (!xmp) return defaults;
 
@@ -73,7 +76,6 @@
     const VueApp = {
         setup() {
             const imgSrc    = Vue.ref('https://oss.ashes.vip/PXL_20220601_085820493.PHOTOSPHERE.jpg');
-            const blobUrl   = Vue.ref('');
             const skyParams = Vue.ref({ phiStart: 0, phiLength: 180, thetaStart: 0, thetaLength: 360 });
             const ready     = Vue.ref(false);
 
@@ -81,20 +83,12 @@
                 const src = getQueryVariable('img');
                 if (src !== false) imgSrc.value = src;
 
-                // 只下载一次，buffer 同时给 exifr 解析和 blob URL 使用
-                const response = await fetch(imgSrc.value);
-                const buffer   = await response.arrayBuffer();
-
-                skyParams.value = await getSkyParams(buffer);
-
-                // 转成 blob URL 给 a-sky 用，不会再发起网络请求
-                const blob  = new Blob([buffer], { type: 'image/jpeg' });
-                blobUrl.value = URL.createObjectURL(blob);
-
+                // 只取头部 128KB 读元数据，图片本身由 a-sky 正常加载
+                skyParams.value = await getSkyParams(imgSrc.value);
                 ready.value = true;
             });
 
-            return { blobUrl, skyParams, ready };
+            return { imgSrc, skyParams, ready };
         }
     };
 
